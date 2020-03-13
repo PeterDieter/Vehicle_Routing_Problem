@@ -3,23 +3,6 @@ import math  # used for square roots and powers (normally already installed)
 import matplotlib.pyplot as plt  # Needed for plotting the solution
 import random  # For random numbers
 
-CustomerCoordinates = np.array([[140.000000, 30.000000],
-                                [0.000000, 60.000000],
-                                [10.000000, 0.000000],
-                                [-100.000000, 100.000000],
-                                [-110.000000, 90.000000],
-                                [40.000000, 40.000000],
-                                [0.000000, 0.000000],
-                                [-90.000000, 0.000000],
-                                [-60.000000, 110.000000],
-                                [-70.000000, 0.000000]])
-
-DepotCoordinates = np.array([[40.000000, 110.000000],
-                             [-140.000000, 140.000000],
-                             [-10.000000, -10.000000]])
-
-Demand = np.array([1, 1, 2, 2, 1, 1, 2, 1, 8, 2])
-
 
 class VRP:
 
@@ -27,6 +10,7 @@ class VRP:
 
         assert np.sum(Demand) <= nTrucks * TruckCapacity, "More demand than all trucks capacities"
         assert TruckCapacity >= np.max(Demand), "One customer has too much demand that fills more than one customer"
+        assert len(Demand) == len(CustomerCoord), "Demand vector and the number of customers is not the same"
 
         self.WaitingTime = WaitingTime
         self.TruckCap = TruckCapacity
@@ -36,7 +20,7 @@ class VRP:
         self.Demand = Demand
         self.CustomerCoord = CustomerCoord
         self.DepotCoord = DepotCoord
-        self.Coordinates = np.concatenate((CustomerCoordinates, DepotCoordinates))
+        self.Coordinates = np.concatenate((CustomerCoord, DepotCoord))
         self.OriginalDistmat = np.sqrt(np.sum((self.Coordinates[None, :] - self.Coordinates[:, None]) ** 2, -1))
         self.trucks = []
 
@@ -65,12 +49,11 @@ class VRP:
         dem = np.zeros(self.nTrucks)
         for k in range(0, self.nTrucks):
             for s in range(1, len(trucks[k]) - 1):
-                dem[k] = dem[k] + Demand[trucks[k][s]]
+                dem[k] = dem[k] + self.Demand[trucks[k][s]]
         return (all(i <= self.TruckCap for i in dem))
 
     def PlotSolution(self):
-        plt.clf()
-        plt.ion()
+
         for k in range(0, self.nTrucks):
             for s in range(0, len(self.trucks[k]) - 1):
                 x = [self.Coordinates[self.trucks[k][s], 0], self.Coordinates[self.trucks[k][s + 1], 0]]
@@ -86,6 +69,8 @@ class VRP:
         for i in range(self.nCustomers, self.nCustomers + self.nDepots):
             plt.scatter(self.Coordinates[i, 0], self.Coordinates[i, 1], color="red")
             # plt.annotate('Dep = %i' %(i+1-N),(Coord[i,0]+1,Coord[i,1]+3))
+        
+        plt.show()
 
     def InitialSolution(self):
         ### Begin With Computing Clusters ###
@@ -125,10 +110,10 @@ class VRP:
                     MinCentroid = np.min(DistCentroids[:, c])  # Check the nearest centroid to that customer
                     index = np.where(DistCentroids[:, c] == MinCentroid)  # Get the Index of that centroid
                     k = index[0][0]  # k  is the truck number
-                    if clusterinfo[k][0] + Demand[
+                    if clusterinfo[k][0] + self.Demand[
                         c] <= self.TruckCap:  # If capacity is met than assign it to that cluster
                         clusters[k].append([c])
-                        clusterinfo[k][0] = clusterinfo[k][0] + Demand[c]
+                        clusterinfo[k][0] = clusterinfo[k][0] + self.Demand[c]
                         clusterinfo[k][1] = clusterinfo[k][1] + MinCentroid
                         clusterinfo[k][2] = clusterinfo[k][2] + self.CustomerCoord[c, 0]
                         clusterinfo[k][3] = clusterinfo[k][3] + self.CustomerCoord[c, 1]
@@ -188,12 +173,12 @@ class VRP:
         i = 0
 
         while ticker < NoImpr and (i < runlength):
-            Temp = math.exp(-0.005 * i)  # set new temperature
+            Temp = math.exp(-0.001 * i)  # set new temperature
             BestWaitingtime = self.GetTotalWaitingTime()  # Bestwaiting time is current waiting time
             DepOrCust = random.uniform(0, 1)  # Decide if Depot or customers are changed
 
             if DepOrCust < DepProb:  # if number is smaller than depprob than change random depot
-                randk = random.randint(0, self.nTrucks - 1)
+                randk = np.random.randint(0, self.nTrucks - 1)
                 currentDep = self.trucks[randk][0]
                 self.trucks[randk][0] = random.randint(self.nCustomers, self.nCustomers + self.nDepots - 1)
             else:  # else change random customer to random place in random truck
@@ -210,7 +195,6 @@ class VRP:
                 if self.GetTotalWaitingTime() < BestWaitingtime:
                     ticker = 0
                     BestWaitingtime = self.GetTotalWaitingTime()
-                    self.PlotSolution()
                     # print("Current Solution is ",BestWaitingtime)
             # else accept the solution with a certain probability. The probability depends on the temperature and how
             # good (bad) the found solution is. If not accepted we change it back
@@ -226,15 +210,3 @@ class VRP:
             i = i + 1  # Total number or runs
 
         return self.trucks
-
-
-game = VRP(CustomerCoord=CustomerCoordinates, DepotCoord=DepotCoordinates, Demand=Demand, WaitingTime=1,
-           TruckCapacity=100, nTrucks=4)
-
-game.InitialSolution()
-print(game.GetTotalWaitingTime())
-game.PlotSolution()
-
-game.SimulatedAnnealing(SA_runlength=5000)
-print(game.GetTotalWaitingTime())
-game.PlotSolution()
