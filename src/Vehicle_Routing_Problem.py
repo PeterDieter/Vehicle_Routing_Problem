@@ -24,6 +24,9 @@ class VRP:
         self.OriginalDistmat = np.sqrt(np.sum((self.Coordinates[None, :] - self.Coordinates[:, None]) ** 2, -1))
         self.trucks = []
 
+        if nTrucks > len(Demand):
+            self.nTrucks = len(Demand)
+
     def GetTotalWaitingTime(self):
         totalwaiting = np.empty((self.nTrucks, 0)).tolist()
         totalwaitingtime = np.zeros(self.nTrucks)
@@ -168,7 +171,7 @@ class VRP:
         ### Begin Simulated Annealing ###
         ticker = 0  # Iteration after no improvement was found
         runlength = SA_runlength  # Maximum number of runs
-        DepProb = 0.2  # Probability that a depot is changed rather than a customers are reallocated
+        DepProb = 0.1  # Probability that a depot is changed rather than a customers are reallocated
         NoImpr = 20000  # Maximum amount of iterations with no improvement until he stops
         i = 0
 
@@ -184,8 +187,8 @@ class VRP:
             else:  # else change random customer to random place in random truck
                 fromk = random.randint(0, self.nTrucks - 1)
                 tok = random.randint(0, self.nTrucks - 1)
-                if len(self.trucks[
-                           fromk]) > 2:  # only do this if there are at least two customers at the from truck. Otherwise results in empty cluster
+                ncust = len(self.trucks[fromk])
+                if ncust > 2:  # only do this if there are at least two customers at the from truck. Otherwise results in empty cluster
                     randomC = random.randint(1, len(self.trucks[fromk]) - 1)
                     randomP = random.randint(1, len(self.trucks[tok]) - 1)
                     self.ChangeCustomerOrder(fromk, tok, randomC, randomP)
@@ -199,13 +202,14 @@ class VRP:
             # else accept the solution with a certain probability. The probability depends on the temperature and how
             # good (bad) the found solution is. If not accepted we change it back
             else:
-                rand = BestWaitingtime / self.GetTotalWaitingTime()
+                rand = np.random.rand()
                 ticker = ticker + 1  # Increase ticker by 1
                 if rand > Temp:
                     if DepOrCust < DepProb:
                         self.trucks[randk][0] = currentDep
                     else:
-                        self.ChangeCustomerOrder(tok, fromk, randomP, randomC)
+                        if ncust > 2:
+                            self.ChangeCustomerOrder(tok, fromk, randomP, randomC)
 
             i = i + 1  # Total number or runs
 
