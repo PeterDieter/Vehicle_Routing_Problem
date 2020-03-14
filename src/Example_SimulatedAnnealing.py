@@ -27,12 +27,12 @@ Demand = np.array([1, 1, 2, 2, 1, 1, 2, 1, 2, 2, 2, 2, 4, 2, 2, 4, 5])
 
 
 game = VRP(CustomerCoord=CustomerCoordinates, DepotCoord=DepotCoordinates, Demand=Demand, WaitingTime=1,
-           TruckCapacity=10, nTrucks=7)
+           TruckCapacity=20, nTrucks=4)
 
 x = game.InitialSolution()
-print(game.GetTotalWaitingTime())
-game.PlotSolution()
+print("Initial Solution", game.GetTotalWaitingTime())
+game.PlotSASolution()
 
-game.SimulatedAnnealing(SA_runlength=10000)
-print(game.GetTotalWaitingTime())
-game.PlotSolution()
+game.SimulatedAnnealing(SA_runlength=20000)
+print("Improved Solution", game.GetTotalWaitingTime())
+game.PlotSASolution()

@@ -2,6 +2,7 @@ import numpy as np  # Useful for array calculations
 import math  # used for square roots and powers (normally already installed)
 import matplotlib.pyplot as plt  # Needed for plotting the solution
 import random  # For random numbers
+import pulp as plp
 
 
 class VRP:
@@ -55,7 +56,7 @@ class VRP:
                 dem[k] = dem[k] + self.Demand[trucks[k][s]]
         return (all(i <= self.TruckCap for i in dem))
 
-    def PlotSolution(self):
+    def PlotSASolution(self):
 
         for k in range(0, self.nTrucks):
             for s in range(0, len(self.trucks[k]) - 1):
@@ -171,7 +172,7 @@ class VRP:
         ### Begin Simulated Annealing ###
         ticker = 0  # Iteration after no improvement was found
         runlength = SA_runlength  # Maximum number of runs
-        DepProb = 0.1  # Probability that a depot is changed rather than a customers are reallocated
+        DepProb = 0.05  # Probability that a depot is changed rather than a customers are reallocated
         NoImpr = 20000  # Maximum amount of iterations with no improvement until he stops
         i = 0
 
@@ -181,9 +182,10 @@ class VRP:
             DepOrCust = random.uniform(0, 1)  # Decide if Depot or customers are changed
 
             if DepOrCust < DepProb:  # if number is smaller than depprob than change random depot
-                randk = np.random.randint(0, self.nTrucks - 1)
-                currentDep = self.trucks[randk][0]
-                self.trucks[randk][0] = random.randint(self.nCustomers, self.nCustomers + self.nDepots - 1)
+                if self.nTrucks > 1:
+                    randk = np.random.randint(0, self.nTrucks - 1)
+                    currentDep = self.trucks[randk][0]
+                    self.trucks[randk][0] = random.randint(self.nCustomers, self.nCustomers + self.nDepots - 1)
             else:  # else change random customer to random place in random truck
                 fromk = random.randint(0, self.nTrucks - 1)
                 tok = random.randint(0, self.nTrucks - 1)
@@ -214,3 +216,112 @@ class VRP:
             i = i + 1  # Total number or runs
 
         return self.trucks
+
+    def LinearProgram(self, LP_runlength):
+        Places = np.arange(self.nCustomers + self.nDepots)  # Number of Places (Customers and Depots)
+        Trucks = np.arange(self.nTrucks)  # Number of Trucks
+        M = 100000 # big M constraint
+
+        # Define the Problem
+        prob = plp.LpProblem("Min Waiting", plp.LpMinimize)
+
+        # Create Decision variables
+        Routes = [(i, j, k) for i in Places for j in Places for k in Trucks]
+        # A dictionary called route_vars is created to contain the referenced variables (the routes)
+        route_vars = plp.LpVariable.dicts("Route", (Places, Places, Trucks), 0, None, cat=plp.LpInteger)
+        u = plp.LpVariable.dicts("Help variable for MTZ constraint", indexs=((i, k) for i in Places for k in Trucks),
+                                 lowBound=0, cat=plp.LpContinuous)
+        K_used = plp.LpVariable("Trucks that are used", cat=plp.LpInteger)
+        TotalCosts = plp.LpVariable("Total costs", cat=plp.LpContinuous)
+
+        # Optimization Function
+        prob += plp.lpSum([u[i, k] for i in Places for k in Trucks]) * self.WaitingTime, "Optimization function"
+
+        # constraint 1: All customers must be visited
+        for i in range(0, len(Places) - self.nDepots):
+            prob += plp.lpSum([route_vars[j][i][k] for k in Trucks for j in Places if i != j]) == 1
+
+        # constraint 2: All truck that arrive must also leave at any Place
+        for h in Places:
+            for k in Trucks:
+                prob += plp.lpSum([route_vars[i][h][k] for i in Places]) - plp.lpSum(
+                    [route_vars[h][j][k] for j in Places]) == 0
+
+        # Constraint 3: Truck Capacity cannot be exceeded
+        for k in Trucks:
+            prob += plp.lpSum([self.Demand[i] * route_vars[i][j][k] for i in range(0, len(Places) - self.nDepots) for j in Places]) <= self.TruckCap
+
+        # constraint 4: Every truck can leave a depot at most one time
+        for k in Trucks:
+            prob += plp.lpSum(
+                [route_vars[i][j][k] for i in range(len(Places) - self.nDepots, len(Places)) for j in range(0, len(Places))]) <= 1
+
+        # constraint 5: Every truck can arrive at a depot at most one time
+        for k in Trucks:
+            prob += plp.lpSum(
+                [route_vars[i][j][k] for j in range(len(Places) - self.nDepots, len(Places)) for i in range(0, len(Places))]) <= 1
+
+        # constraint 6: Total Number of Trucks
+        prob += plp.lpSum(
+            [route_vars[i][j][k] for i in range(len(Places) - self.nDepots, len(Places)) for j in range(0, len(Places) - self.nDepots) for k
+             in Trucks]) <= K_used
+
+        # constraint 7: No subtours (Miller Tucker Zemlin)
+        for i in Places:
+            for j in range(0, self.nCustomers):
+                for k in Trucks:
+                    if j != i:
+                        prob += u[i, k] - u[j, k] + self.OriginalDistmat[i, j] <= M * (1 - route_vars[i][j][k])
+
+        # Constraint 8: Total trucks used need to be smaller or equal to total amount of trucks
+        prob += K_used <= self.nTrucks
+
+        # Solve the problem. Set the maximum time that the solver will run
+        prob.solve(plp.PULP_CBC_CMD(maxSeconds=LP_runlength))
+
+        # Print Status of the solver as well as objective value found so far
+        print("status:", plp.LpStatus[prob.status])
+        print("Total Waiting Time in hours: ' ", plp.value(prob.objective))
+
+        # Print and Store Results
+        Lfrom = []  # List with Places from i
+        Lto = []  # List with Places to j
+        Ltruck = []  # List of truck used to go from place i to j
+        trucks = []
+        for i in Places:
+            for k in Trucks:
+                for j in Places:
+                    if plp.value(route_vars[i][j][k]) != 0 and plp.value(route_vars[i][j][k]) is not None:
+                        if i < self.nCustomers and j < self.nCustomers:
+                            Lfrom.append(i)
+                            Lto.append(j)
+                            Ltruck.append(k)
+                        if i >= self.nCustomers:
+                            Lfrom.append(i)
+                            Lto.append(j)
+                            Ltruck.append(k)
+
+
+        # Plot the solution (First lines, than points)
+        plt.figure()
+        for s in range(0, len(Lfrom)):
+            x = [self.OriginalDistmat[Lfrom[s], 0], self.OriginalDistmat[Lto[s], 0]]
+            y = [self.OriginalDistmat[Lfrom[s], 1], self.OriginalDistmat[Lto[s], 1]]
+            truck = Ltruck[s]
+            c = [float(truck) / float(10), 0.0, float(10 - truck) / float(10)]
+            plt.plot(x, y, color=c)
+            plt.gray()
+
+        # Make customer points blue
+        for i in range(0, self.nCustomers):
+            plt.scatter(self.OriginalDistmat[i, 0], self.OriginalDistmat[i, 1], color="blue")
+            # plt.annotate('C = %i' %(i+1),(Coord[i,0]+1,Coord[i,1]+3))
+
+        # Make Depot points red
+        for i in range(self.nCustomers, self.nCustomers + self.nDepots):
+            plt.scatter(self.OriginalDistmat[i, 0], self.OriginalDistmat[i, 1], color="red")
+            # plt.annotate('Dep = %i' %(i+1-N),(Coord[i,0]+1,Coord[i,1]+3))
+
+        plt.show()
+
+
