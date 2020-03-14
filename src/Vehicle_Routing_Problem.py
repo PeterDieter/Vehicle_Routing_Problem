@@ -73,7 +73,7 @@ class VRP:
         for i in range(self.nCustomers, self.nCustomers + self.nDepots):
             plt.scatter(self.Coordinates[i, 0], self.Coordinates[i, 1], color="red")
             # plt.annotate('Dep = %i' %(i+1-N),(Coord[i,0]+1,Coord[i,1]+3))
-        
+
         plt.show()
 
     def InitialSolution(self):
@@ -324,6 +324,7 @@ class VRP:
             plt.scatter(self.OriginalDistmat[i, 0], self.OriginalDistmat[i, 1], color="red")
             # plt.annotate('Dep = %i' %(i+1-N),(Coord[i,0]+1,Coord[i,1]+3))
 
+        plt.title("Solution found by Linear Program")
         plt.show()
 
 
