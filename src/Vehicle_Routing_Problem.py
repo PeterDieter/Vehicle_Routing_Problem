@@ -169,6 +169,7 @@ class VRP:
         return self.trucks
 
     def SimulatedAnnealing(self, SA_runlength):
+        assert len(self.trucks) > 0 , "Initial Solution is needed"
         ### Begin Simulated Annealing ###
         ticker = 0  # Iteration after no improvement was found
         runlength = SA_runlength  # Maximum number of runs
