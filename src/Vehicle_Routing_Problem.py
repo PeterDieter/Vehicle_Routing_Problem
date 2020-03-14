@@ -176,9 +176,10 @@ class VRP:
         DepProb = 0.05  # Probability that a depot is changed rather than a customers are reallocated
         NoImpr = 20000  # Maximum amount of iterations with no improvement until he stops
         i = 0
+        factor = -10/runlength
 
         while ticker < NoImpr and (i < runlength):
-            Temp = math.exp(-0.001 * i)  # set new temperature
+            Temp = math.exp(factor * i)  # set new temperature
             BestWaitingtime = self.GetTotalWaitingTime()  # Bestwaiting time is current waiting time
             DepOrCust = random.uniform(0, 1)  # Decide if Depot or customers are changed
 
@@ -258,9 +259,9 @@ class VRP:
                 [route_vars[i][j][k] for i in range(len(Places) - self.nDepots, len(Places)) for j in range(0, len(Places))]) <= 1
 
         # constraint 5: Every truck can arrive at a depot at most one time
-        for k in Trucks:
-            prob += plp.lpSum(
-                [route_vars[i][j][k] for j in range(len(Places) - self.nDepots, len(Places)) for i in range(0, len(Places))]) <= 1
+       # for k in Trucks:
+       #     prob += plp.lpSum(
+       #         [route_vars[i][j][k] for j in range(len(Places) - self.nDepots, len(Places)) for i in range(0, len(Places))]) <= 1
 
         # constraint 6: Total Number of Trucks
         prob += plp.lpSum(
