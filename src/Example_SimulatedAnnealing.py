@@ -33,6 +33,6 @@ x = game.InitialSolution()
 print("Initial Solution", game.GetTotalWaitingTime())
 game.PlotSASolution()
 
-game.SimulatedAnnealing(SA_runlength=20000)
+game.SimulatedAnnealing(SA_runlength=100)
 print("Improved Solution", game.GetTotalWaitingTime())
 game.PlotSASolution()

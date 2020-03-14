@@ -5,17 +5,19 @@ CustomerCoordinates = np.array([[140.000000, 30.000000],
                                 [0.000000, 60.000000],
                                 [10.000000, 0.000000],
                                 [-100.000000, 100.000000],
+                                [60.000000, -20.000000],
+                                [-10.000000, 100.000000],
                                 [-70.000000, 0.000000]])
 
 DepotCoordinates = np.array([[40.000000, 110.000000],
                              [-140.000000, 140.000000],
                              [-10.000000, -10.000000]])
 
-Demand = np.array([1, 1, 2, 2, 1])
+Demand = np.array([1, 1, 2, 2, 1, 2, 2])
 
 
 game = VRP(CustomerCoord=CustomerCoordinates, DepotCoord=DepotCoordinates, Demand=Demand, WaitingTime=1,
            TruckCapacity=20, nTrucks=2)
 
-game.LinearProgram(LP_runlength=50)
+game.LinearProgram(LP_runlength=20)
 
